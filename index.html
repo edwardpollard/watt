@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a1628">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Watt — Energy Insights</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="application-name" content="Watt">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a1628;
+    --bg2: #0f1e35;
+    --bg3: #162440;
+    --border: rgba(255,255,255,0.07);
+    --accent: #00d4aa;
+    --accent2: #ff6b35;
+    --accent3: #4fc3f7;
+    --text: #e8f4f8;
+    --muted: #6b8499;
+    --card: rgba(255,255,255,0.04);
+    --night: #a78bfa;
+    --day: #fb923c;
+    --peak: #f43f5e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Lato', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* APP SHELL */
+  #app { height: 100vh; display: flex; flex-direction: column; }
+  #header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px 0;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; color: var(--accent); letter-spacing: -1px; }
+  .logo span { color: var(--text); opacity: 0.4; font-weight: 400; font-size: 13px; margin-left: 6px; letter-spacing: 0; vertical-align: middle; }
+  .upload-btn {
+    background: var(--accent);
+    color: #0a1628;
+    border: none;
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+  }
+
+  /* NAV TABS */
+  .nav-tabs { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-family: 'Syne', sans-serif; font-weight: 600;
+    font-size: 12px; padding: 8px 16px; border-bottom: 2px solid transparent;
+    white-space: nowrap; letter-spacing: 0.5px; transition: all 0.2s;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* SCROLL CONTENT */
+  #content { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); scrollbar-width: thin; scrollbar-color: var(--bg3) transparent; }
+  #content::-webkit-scrollbar { width: 4px; }
+  #content::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* CARDS */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 12px;
+  }
+
+  /* STAT GRID */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 12px;
+  }
+  .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .stat-value { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* INSIGHT ITEMS */
+  .insight {
+    display: flex; gap: 12px; padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .insight:last-child { border-bottom: none; padding-bottom: 0; }
+  .insight-icon { font-size: 20px; flex-shrink: 0; width: 32px; text-align: center; margin-top: 2px; }
+  .insight-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .insight-body { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .insight-body strong { color: var(--text); }
+
+  /* RATE BARS */
+  .rate-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .rate-label { font-size: 12px; width: 48px; flex-shrink: 0; }
+  .rate-bar-wrap { flex: 1; background: rgba(255,255,255,0.06); border-radius: 4px; height: 12px; overflow: hidden; }
+  .rate-bar { height: 100%; border-radius: 4px; transition: width 0.8s ease; }
+  .rate-val { font-family: 'DM Mono', monospace; font-size: 12px; width: 60px; text-align: right; flex-shrink: 0; }
+  .rate-cost { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); width: 50px; text-align: right; flex-shrink: 0; }
+
+  /* TARIFF COMPARISON */
+  .tariff-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px; margin-bottom: 10px;
+    position: relative; overflow: hidden;
+  }
+  .tariff-card.best { border-color: var(--accent); }
+  .tariff-card.best::before {
+    content: 'BEST'; position: absolute; top: 10px; right: 10px;
+    background: var(--accent); color: #0a1628; font-family: 'Syne', sans-serif;
+    font-weight: 800; font-size: 9px; padding: 3px 7px; border-radius: 10px; letter-spacing: 1px;
+  }
+  .tariff-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .tariff-plan { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  .tariff-cost { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 26px; }
+  .tariff-cost span { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .tariff-saving { font-size: 12px; margin-top: 4px; }
+  .tariff-rates { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .tariff-rate-badge {
+    font-size: 10px; padding: 3px 8px; border-radius: 10px;
+    background: rgba(255,255,255,0.06); font-family: 'DM Mono', monospace;
+  }
+
+  /* NIGHT OPTIMISER */
+  .hour-grid { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin: 12px 0; }
+  .hour-cell {
+    height: 32px; border-radius: 3px; cursor: default;
+    transition: transform 0.1s;
+  }
+  .hour-labels { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; }
+  .hour-lbl { font-size: 8px; color: var(--muted); text-align: center; }
+  .shift-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .shift-row:last-child { border-bottom: none; }
+  .shift-label { font-size: 12px; }
+  .shift-saving { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; color: var(--accent); }
+
+  /* UPLOAD SCREEN */
+  #upload-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; padding: 32px; padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); text-align: center;
+  }
+  .upload-area {
+    border: 2px dashed rgba(0,212,170,0.3); border-radius: 20px;
+    padding: 40px 24px; width: 100%; max-width: 320px;
+    background: rgba(0,212,170,0.03);
+  }
+  .upload-icon { font-size: 48px; margin-bottom: 16px; }
+  .upload-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px; margin-bottom: 8px; }
+  .upload-sub { font-size: 13px; color: var(--muted); line-height: 1.7; margin-bottom: 24px; }
+  .file-input-label {
+    display: inline-block; background: var(--accent); color: #0a1628;
+    border-radius: 25px; padding: 12px 28px; font-family: 'Syne', sans-serif;
+    font-weight: 700; font-size: 14px; cursor: pointer; letter-spacing: 0.5px;
+  }
+  #file-input { display: none; }
+  .history-btn {
+    margin-top: 16px; background: none; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 25px; padding: 10px 24px;
+    font-family: 'Syne', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; width: 100%;
+  }
+
+  /* CHART CONTAINER */
+  .chart-wrap { position: relative; width: 100%; }
+
+  /* MONTH BADGES */
+  .month-pill {
+    display: inline-block; background: rgba(255,255,255,0.06);
+    border-radius: 20px; padding: 4px 10px; font-size: 11px;
+    font-family: 'DM Mono', monospace; margin: 3px;
+  }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 20px;
+    padding: 10px 20px; font-size: 13px; transition: transform 0.3s;
+    z-index: 100; white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  .green { color: var(--accent); }
+  .orange { color: var(--accent2); }
+  .blue { color: var(--accent3); }
+  .purple { color: var(--night); }
+  .red { color: var(--peak); }
+
+  .section-gap { height: 8px; }
+
+  /* Recommendation pills */
+  .rec-pill {
+    display: inline-block; font-size: 10px; padding: 2px 8px;
+    border-radius: 10px; margin-right: 4px; margin-bottom: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+  .rec-high { background: rgba(244,63,94,0.15); color: var(--peak); border: 1px solid rgba(244,63,94,0.3); }
+  .rec-med { background: rgba(251,146,60,0.15); color: var(--accent2); border: 1px solid rgba(251,146,60,0.3); }
+  .rec-low { background: rgba(0,212,170,0.1); color: var(--accent); border: 1px solid rgba(0,212,170,0.2); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header" style="display:none;">
+    <div class="header-top">
+      <div>
+        <div class="logo">watt <span>energy insights</span></div>
+        <div id="data-range" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
+      </div>
+      <label class="upload-btn" for="file-input-header">+ Import</label>
+      <input type="file" id="file-input-header" accept=".csv" style="display:none">
+    </div>
+    <div class="nav-tabs">
+      <button class="tab active" data-page="overview">Overview</button>
+      <button class="tab" data-page="nightrate">Night Rate</button>
+      <button class="tab" data-page="tariffs">Tariffs</button>
+      <button class="tab" data-page="trends">Trends</button>
+      <button class="tab" data-page="advice">Advice</button>
+    </div>
+  </div>
+
+  <div id="content">
+    <!-- UPLOAD SCREEN -->
+    <div id="upload-screen">
+      <div class="upload-area">
+        <div class="upload-icon">⚡</div>
+        <div class="upload-title">Watt</div>
+        <div class="upload-sub">
+          Import your ESB Networks HDF CSV export to get personalised energy insights, tariff comparisons, and night rate optimisation.
+        </div>
+        <label class="file-input-label" for="file-input">Choose CSV File</label>
+        <input type="file" id="file-input" accept=".csv">
+        <button class="history-btn" id="load-history-btn" style="display:none">View Previous Data</button>
+      </div>
+      <div style="margin-top:24px;font-size:11px;color:var(--muted);max-width:280px;line-height:1.8;">
+        Download your data from <strong style="color:var(--text)">myaccount.esbnetworks.ie</strong> → Meter Readings → Download HDF
+      </div>
+    </div>
+
+    <!-- MAIN PAGES -->
+    <div id="main-pages" style="display:none;">
+
+      <!-- OVERVIEW -->
+      <div class="page active" id="page-overview">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Used</div>
+            <div class="stat-value green" id="stat-total">—</div>
+            <div class="stat-sub" id="stat-period">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Daily Average</div>
+            <div class="stat-value blue" id="stat-daily">—</div>
+            <div class="stat-sub">kWh per day</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Est. Monthly Cost</div>
+            <div class="stat-value orange" id="stat-monthly-cost">—</div>
+            <div class="stat-sub">at current rates</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Night Rate %</div>
+            <div class="stat-value purple" id="stat-night-pct">—</div>
+            <div class="stat-sub">of total usage</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Rate Breakdown</div>
+          <div id="rate-breakdown"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Monthly Usage</div>
+          <div class="chart-wrap"><canvas id="chart-monthly" height="160"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Top Insights</div>
+          <div id="top-insights"></div>
+        </div>
+      </div>
+
+      <!-- NIGHT RATE -->
+      <div class="page" id="page-nightrate">
+        <div class="card">
+          <div class="card-title">Your Night Rate Window</div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+            Yuno night rate applies <strong style="color:var(--night)">11pm – 8am</strong> at €0.1891/kWh vs €0.3091 day rate
+          </div>
+          <div class="hour-grid" id="hour-heatmap"></div>
+          <div class="hour-labels" id="hour-labels"></div>
+          <div style="display:flex;gap:16px;margin-top:10px;font-size:10px;color:var(--muted);">
+            <span>🟦 Night rate</span>
+            <span>🟧 Day rate</span>
+            <span>🟥 Peak rate</span>
+            <span style="margin-left:auto;">Darker = more usage</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Usage by Rate Period</div>
+          <div class="chart-wrap"><canvas id="chart-rate-pie" height="180"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Shifting Savings</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+            If you moved these loads to the night rate window, estimated monthly savings:
+          </div>
+          <div id="shift-savings"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Night Rate Performance</div>
+          <div class="chart-wrap"><canvas id="chart-night-trend" height="150"></canvas></div>
+        </div>
+      </div>
+
+      <!-- TARIFFS -->
+      <div class="page" id="page-tariffs">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.7;">
+          Your actual 30-minute usage data modelled against Irish supplier tariffs. Your current plan is highlighted.
+        </div>
+        <div id="tariff-list"></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6;padding:12px;background:var(--card);border-radius:12px;">
+          ⚠️ Estimates based on published unit rates only. Standing charges, PSO levy and VAT included. Actual bills may vary. Always verify on supplier websites before switching. Your contract with Yuno ends <strong style="color:var(--text)">3 July 2026</strong> — early exit fees may apply.
+        </div>
+      </div>
+
+      <!-- TRENDS -->
+      <div class="page" id="page-trends">
+        <div class="card">
+          <div class="card-title">Daily Usage (Last 60 Days)</div>
+          <div class="chart-wrap"><canvas id="chart-daily" height="160"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Average by Hour of Day</div>
+          <div class="chart-wrap"><canvas id="chart-hourly" height="160"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Day of Week Pattern</div>
+          <div class="chart-wrap"><canvas id="chart-dow" height="150"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Peak Usage Days</div>
+          <div id="peak-days-list"></div>
+        </div>
+      </div>
+
+      <!-- ADVICE -->
+      <div class="page" id="page-advice">
+        <div id="advice-list"></div>
+      </div>
+
+    </div><!-- /main-pages -->
+    <div style="height:24px;flex-shrink:0;"></div>
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// DATA STORAGE (IndexedDB)
+// ============================================================
+const DB_NAME = 'watt_db', DB_VER = 1, STORE = 'readings';
+let db;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+
+function saveReadings(readings) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    // Clear and re-save all
+    store.clear();
+    readings.forEach(r => store.add(r));
+    tx.oncomplete = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+}
+
+function loadReadings() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+// ============================================================
+// CSV PARSER
+// ============================================================
+function parseCSV(text) {
+  const lines = text.trim().split('\n').slice(1); // skip header
+  const readings = [];
+  for (const line of lines) {
+    const cols = line.split(',');
+    if (cols.length < 5) continue;
+    const kWh = parseFloat(cols[2]);
+    const dtStr = cols[4].trim().replace('\r', '');
+    // Parse dd-mm-yyyy HH:MM
+    const [datePart, timePart] = dtStr.split(' ');
+    if (!datePart || !timePart) continue;
+    const [dd, mm, yyyy] = datePart.split('-');
+    const [hh, mn] = timePart.split(':');
+    const dt = new Date(+yyyy, +mm - 1, +dd, +hh, +mn);
+    if (isNaN(dt) || isNaN(kWh)) continue;
+    readings.push({
+      dt: dt.toISOString(),
+      kWh,
+      hour: dt.getHours(),
+      dow: dt.getDay(), // 0=Sun
+      date: `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`,
+      month: `${yyyy}-${mm.padStart(2,'0')}`
+    });
+  }
+  return readings.sort((a, b) => a.dt.localeCompare(b.dt));
+}
+
+// ============================================================
+// TARIFF DEFINITIONS (Irish suppliers, March 2026 approx)
+// ============================================================
+const TARIFFS = [
+  {
+    name: 'Yuno Energy',
+    plan: 'TOU Variable (Your Current Plan)',
+    current: true,
+    day: 0.3091, night: 0.1891, peak: 0.3354,
+    standing: 0.5926, pso: 1.49, vat: 0.09,
+    nightHours: [23, 0, 1, 2, 3, 4, 5, 6, 7],
+    peakHours: [17, 18],
+    color: '#00d4aa'
+  },
+  {
+    name: 'Electric Ireland',
+    plan: 'Home Electric+ Night',
+    current: false,
+    day: 0.3145, night: 0.1652, peak: null,
+    standing: 0.6200, pso: 1.49, vat: 0.09,
+    nightHours: [23, 0, 1, 2, 3, 4, 5, 6, 7, 8],
+    peakHours: [],
+    color: '#4fc3f7'
+  },
+  {
+    name: 'Energia',
+    plan: 'Smart EV Saver',
+    current: false,
+    day: 0.2980, night: 0.1420, peak: null,
+    standing: 0.6400, pso: 1.49, vat: 0.09,
+    nightHours: [23, 0, 1, 2, 3, 4, 5, 6, 7, 8],
+    peakHours: [],
+    color: '#a78bfa'
+  },
+  {
+    name: 'Bord Gáis Energy',
+    plan: 'Smart Home',
+    current: false,
+    day: 0.3210, night: 0.1750, peak: null,
+    standing: 0.5800, pso: 1.49, vat: 0.09,
+    nightHours: [23, 0, 1, 2, 3, 4, 5, 6, 7],
+    peakHours: [],
+    color: '#fb923c'
+  },
+  {
+    name: 'Pinergy',
+    plan: 'Smart Pay As You Go',
+    current: false,
+    day: 0.3350, night: 0.1890, peak: null,
+    standing: 0.5500, pso: 1.49, vat: 0.09,
+    nightHours: [23, 0, 1, 2, 3, 4, 5, 6, 7],
+    peakHours: [],
+    color: '#f43f5e'
+  }
+];
+
+// ============================================================
+// ANALYTICS ENGINE
+// ============================================================
+function analyse(readings) {
+  const total = readings.reduce((s, r) => s + r.kWh, 0);
+
+  // Night/Day/Peak classification (Yuno)
+  const nightHours = new Set([23, 0, 1, 2, 3, 4, 5, 6, 7]);
+  const peakHours = new Set([17, 18]);
+
+  let nightKwh = 0, dayKwh = 0, peakKwh = 0;
+  readings.forEach(r => {
+    if (peakHours.has(r.hour)) peakKwh += r.kWh;
+    else if (nightHours.has(r.hour)) nightKwh += r.kWh;
+    else dayKwh += r.kWh;
+  });
+
+  // Monthly totals
+  const byMonth = {};
+  readings.forEach(r => {
+    byMonth[r.month] = (byMonth[r.month] || 0) + r.kWh;
+  });
+
+  // Daily totals
+  const byDate = {};
+  readings.forEach(r => {
+    byDate[r.date] = (byDate[r.date] || 0) + r.kWh;
+  });
+
+  // Hourly avg
+  const byHour = Array(24).fill(0);
+  const byHourCount = Array(24).fill(0);
+  readings.forEach(r => {
+    byHour[r.hour] += r.kWh;
+    byHourCount[r.hour]++;
+  });
+  const hourlyAvg = byHour.map((s, i) => byHourCount[i] ? s / byHourCount[i] : 0);
+
+  // DOW avg
+  const byDow = Array(7).fill(0);
+  const byDowCount = Array(7).fill(0);
+  readings.forEach(r => {
+    byDow[r.dow] += r.kWh;
+    byDowCount[r.dow]++;
+  });
+  // Reorder Sun=0 -> Mon=0
+  const dowAvg = [1,2,3,4,5,6,0].map(d => byDowCount[d] ? byDow[d] / byDowCount[d] : 0);
+
+  // Dates
+  const dates = Object.keys(byDate).sort();
+  const firstDate = dates[0];
+  const lastDate = dates[dates.length - 1];
+  const dayCount = dates.length;
+  const avgDaily = total / dayCount;
+
+  // Baseload estimate (median of overnight minimum)
+  const overnightSlots = readings.filter(r => r.hour >= 2 && r.hour <= 5);
+  const sortedON = overnightSlots.map(r => r.kWh).sort((a, b) => a - b);
+  const baseload = sortedON[Math.floor(sortedON.length * 0.1)] || 0; // 10th percentile
+
+  // Monthly night % trend
+  const monthNightPct = {};
+  const monthNightKwh = {};
+  const monthTotalKwh = {};
+  readings.forEach(r => {
+    monthTotalKwh[r.month] = (monthTotalKwh[r.month] || 0) + r.kWh;
+    if (nightHours.has(r.hour)) monthNightKwh[r.month] = (monthNightKwh[r.month] || 0) + r.kWh;
+  });
+  Object.keys(monthTotalKwh).forEach(m => {
+    monthNightPct[m] = monthTotalKwh[m] ? ((monthNightKwh[m] || 0) / monthTotalKwh[m]) * 100 : 0;
+  });
+
+  // Cost calculation (Yuno)
+  const yuno = TARIFFS[0];
+  const unitCost = nightKwh * yuno.night + dayKwh * yuno.day + peakKwh * yuno.peak;
+  const months = Object.keys(byMonth).length || 1;
+  const standingTotal = (dayCount * yuno.standing);
+  const psoTotal = months * yuno.pso;
+  const totalCost = (unitCost + standingTotal + psoTotal) * (1 + yuno.vat);
+  const avgMonthlyCost = totalCost / months;
+
+  // Tariff comparison
+  const tariffCosts = TARIFFS.map(t => {
+    const tNight = new Set(t.nightHours);
+    const tPeak = new Set(t.peakHours || []);
+    let tN = 0, tD = 0, tP = 0;
+    readings.forEach(r => {
+      if (tPeak.has(r.hour)) tP += r.kWh;
+      else if (tNight.has(r.hour)) tN += r.kWh;
+      else tD += r.kWh;
+    });
+    const units = tN * t.night + tD * t.day + (t.peak ? tP * t.peak : tD * t.day + tP * t.day - tD * t.day);
+    // Recalc properly
+    let unitC = tN * t.night + tD * t.day;
+    if (t.peak) unitC += tP * t.peak; else unitC += tP * t.day;
+    const standing = dayCount * t.standing;
+    const pso = months * t.pso;
+    const total = (unitC + standing + pso) * (1 + t.vat);
+    return { ...t, totalCost: total, monthlyCost: total / months, nightKwh: tN, dayKwh: tD };
+  });
+  tariffCosts.sort((a, b) => a.totalCost - b.totalCost);
+
+  // Peak day usage in daytime
+  // How much is used in 17-18h (peak) per month
+  const peakMonthly = peakKwh / months;
+  const peakMonthlyCost = peakMonthly * (yuno.peak - yuno.night);
+
+  // Day usage that could shift to night
+  // Conservatively: if 20% of day usage shifted to night
+  const shiftable20pct = dayKwh * 0.2;
+  const shiftSaving = (shiftable20pct * (yuno.day - yuno.night)) * (1 + yuno.vat);
+
+  return {
+    total, nightKwh, dayKwh, peakKwh,
+    byMonth, byDate, dates, hourlyAvg, dowAvg,
+    firstDate, lastDate, dayCount, avgDaily,
+    baseload, monthNightPct, monthTotalKwh, monthNightKwh,
+    avgMonthlyCost, totalCost,
+    tariffCosts,
+    nightPct: (nightKwh / total) * 100,
+    dayPct: (dayKwh / total) * 100,
+    peakPct: (peakKwh / total) * 100,
+    peakMonthlyCost,
+    shiftSaving,
+    months
+  };
+}
+
+// ============================================================
+// CHART HELPERS
+// ============================================================
+const charts = {};
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: true,
+  plugins: { legend: { display: false }, tooltip: {
+    backgroundColor: '#162440', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+    titleColor: '#6b8499', bodyColor: '#e8f4f8', padding: 10,
+    titleFont: { family: 'DM Mono', size: 11 }, bodyFont: { family: 'Syne', size: 13, weight: '700' }
+  }},
+  scales: {
+    x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b8499', font: { size: 10 } } },
+    y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b8499', font: { size: 10 } } }
+  }
+};
+
+// ============================================================
+// RENDER FUNCTIONS
+// ============================================================
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: '2-digit' });
+}
+
+function renderOverview(a) {
+  document.getElementById('stat-total').textContent = a.total.toFixed(0) + ' kWh';
+  document.getElementById('stat-period').textContent = fmtDate(a.firstDate) + ' – ' + fmtDate(a.lastDate);
+  document.getElementById('stat-daily').textContent = a.avgDaily.toFixed(1) + ' kWh';
+  document.getElementById('stat-monthly-cost').textContent = '€' + a.avgMonthlyCost.toFixed(0);
+  document.getElementById('stat-night-pct').textContent = a.nightPct.toFixed(0) + '%';
+  document.getElementById('data-range').textContent = fmtDate(a.firstDate) + ' — ' + fmtDate(a.lastDate);
+
+  // Rate breakdown bars
+  const maxKwh = Math.max(a.nightKwh, a.dayKwh, a.peakKwh);
+  document.getElementById('rate-breakdown').innerHTML = `
+    <div class="rate-row">
+      <div class="rate-label" style="color:var(--night)">Night</div>
+      <div class="rate-bar-wrap"><div class="rate-bar" style="width:${(a.nightKwh/maxKwh*100).toFixed(0)}%;background:var(--night)"></div></div>
+      <div class="rate-val">${a.nightKwh.toFixed(0)} kWh</div>
+      <div class="rate-cost">€${(a.nightKwh*0.1891*1.09).toFixed(0)}</div>
+    </div>
+    <div class="rate-row">
+      <div class="rate-label" style="color:var(--day)">Day</div>
+      <div class="rate-bar-wrap"><div class="rate-bar" style="width:${(a.dayKwh/maxKwh*100).toFixed(0)}%;background:var(--day)"></div></div>
+      <div class="rate-val">${a.dayKwh.toFixed(0)} kWh</div>
+      <div class="rate-cost">€${(a.dayKwh*0.3091*1.09).toFixed(0)}</div>
+    </div>
+    <div class="rate-row">
+      <div class="rate-label" style="color:var(--peak)">Peak</div>
+      <div class="rate-bar-wrap"><div class="rate-bar" style="width:${(a.peakKwh/maxKwh*100).toFixed(0)}%;background:var(--peak)"></div></div>
+      <div class="rate-val">${a.peakKwh.toFixed(0)} kWh</div>
+      <div class="rate-cost">€${(a.peakKwh*0.3354*1.09).toFixed(0)}</div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6;">
+      Night: 11pm–8am · Peak: 5–7pm · Day: all other hours
+    </div>
+  `;
+
+  // Monthly chart
+  const months = Object.keys(a.byMonth).sort();
+  const monthLabels = months.map(m => { const [y, mo] = m.split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1] + " '" + y.slice(2); });
+  destroyChart('monthly');
+  charts['monthly'] = new Chart(document.getElementById('chart-monthly'), {
+    type: 'bar',
+    data: {
+      labels: monthLabels,
+      datasets: [{
+        data: months.map(m => a.byMonth[m].toFixed(1)),
+        backgroundColor: months.map(m => a.byMonth[m] === Math.max(...Object.values(a.byMonth)) ? '#00d4aa' : 'rgba(79,195,247,0.3)'),
+        borderRadius: 6, borderSkipped: false
+      }]
+    },
+    options: { ...chartDefaults }
+  });
+
+  // Top insights
+  const insights = generateInsights(a);
+  document.getElementById('top-insights').innerHTML = insights.slice(0, 4).map(i => `
+    <div class="insight">
+      <div class="insight-icon">${i.icon}</div>
+      <div><div class="insight-title">${i.title}</div><div class="insight-body">${i.body}</div></div>
+    </div>
+  `).join('');
+}
+
+function renderNightRate(a) {
+  // Heatmap
+  const heatmap = document.getElementById('hour-heatmap');
+  const nightHours = new Set([23, 0, 1, 2, 3, 4, 5, 6, 7]);
+  const peakHours = new Set([17, 18]);
+  const maxH = Math.max(...a.hourlyAvg);
+  heatmap.innerHTML = a.hourlyAvg.map((v, h) => {
+    const intensity = maxH ? v / maxH : 0;
+    let baseColor, alpha;
+    if (peakHours.has(h)) { baseColor = '244,63,94'; }
+    else if (nightHours.has(h)) { baseColor = '167,139,250'; }
+    else { baseColor = '251,146,60'; }
+    alpha = 0.1 + intensity * 0.85;
+    return `<div class="hour-cell" title="${h}:00 avg ${v.toFixed(3)} kWh" style="background:rgba(${baseColor},${alpha.toFixed(2)})"></div>`;
+  }).join('');
+
+  const labels = document.getElementById('hour-labels');
+  labels.innerHTML = Array.from({length: 24}, (_, h) =>
+    `<div class="hour-lbl">${h===0?'12a':h===12?'12p':h<12?h+'a':(h-12)+'p'}</div>`
+  ).join('');
+
+  // Pie chart
+  destroyChart('rate-pie');
+  charts['rate-pie'] = new Chart(document.getElementById('chart-rate-pie'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Night (€0.189)', 'Day (€0.309)', 'Peak (€0.335)'],
+      datasets: [{
+        data: [a.nightKwh.toFixed(1), a.dayKwh.toFixed(1), a.peakKwh.toFixed(1)],
+        backgroundColor: ['rgba(167,139,250,0.8)', 'rgba(251,146,60,0.8)', 'rgba(244,63,94,0.8)'],
+        borderWidth: 0, hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, cutout: '65%',
+      plugins: {
+        legend: { display: true, position: 'bottom', labels: { color: '#6b8499', font: { size: 11, family: 'Lato' }, padding: 16, boxWidth: 12 } },
+        tooltip: chartDefaults.plugins.tooltip
+      }
+    }
+  });
+
+  // Shift savings
+  const peakSaving = a.peakKwh / a.months * (0.3354 - 0.1891) * 1.09;
+  const morning7to8 = a.hourlyAvg[7] * 30 * 2; // approx monthly kWh at 7am
+  const shiftMorning = morning7to8 * (0.3091 - 0.1891) * 1.09;
+
+  document.getElementById('shift-savings').innerHTML = `
+    <div class="shift-row">
+      <div>
+        <div class="shift-label">Move peak hours (5–7pm) to night</div>
+        <div style="font-size:11px;color:var(--muted)">~${(a.peakKwh/a.months).toFixed(0)} kWh/month in peak window</div>
+      </div>
+      <div class="shift-saving">€${peakSaving.toFixed(0)}/mo</div>
+    </div>
+    <div class="shift-row">
+      <div>
+        <div class="shift-label">Shift 20% of day usage to night</div>
+        <div style="font-size:11px;color:var(--muted)">e.g. dishwasher, washing machine, immersion</div>
+      </div>
+      <div class="shift-saving">€${(a.shiftSaving/a.months).toFixed(0)}/mo</div>
+    </div>
+    <div class="shift-row">
+      <div>
+        <div class="shift-label">Total potential monthly saving</div>
+        <div style="font-size:11px;color:var(--muted)">annual: ~€${((peakSaving + a.shiftSaving/a.months)*12).toFixed(0)}</div>
+      </div>
+      <div class="shift-saving">€${(peakSaving + a.shiftSaving/a.months).toFixed(0)}/mo</div>
+    </div>
+  `;
+
+  // Night % trend
+  const nMonths = Object.keys(a.monthNightPct).sort();
+  const nLabels = nMonths.map(m => { const [y,mo] = m.split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]; });
+  destroyChart('night-trend');
+  charts['night-trend'] = new Chart(document.getElementById('chart-night-trend'), {
+    type: 'line',
+    data: {
+      labels: nLabels,
+      datasets: [{
+        label: 'Night %',
+        data: nMonths.map(m => a.monthNightPct[m].toFixed(1)),
+        borderColor: 'rgba(167,139,250,0.9)', backgroundColor: 'rgba(167,139,250,0.1)',
+        tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor: '#a78bfa'
+      }]
+    },
+    options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, max: 100, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' } } } }
+  });
+}
+
+function renderTariffs(a) {
+  const currentCost = a.tariffCosts.find(t => t.current)?.totalCost || a.totalCost;
+  const cheapest = a.tariffCosts[0];
+
+  document.getElementById('tariff-list').innerHTML = a.tariffCosts.map((t, i) => {
+    const saving = currentCost - t.totalCost;
+    const isBest = i === 0;
+    const isCurrent = t.current;
+    return `
+      <div class="tariff-card ${isBest && !isCurrent ? 'best' : ''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div>
+            <div class="tariff-name" style="color:${t.color}">${t.name}</div>
+            <div class="tariff-plan">${t.plan}</div>
+          </div>
+          ${isCurrent ? `<span style="background:rgba(255,255,255,0.08);color:var(--muted);font-size:9px;padding:3px 8px;border-radius:10px;font-family:\'DM Mono\',monospace;flex-shrink:0;margin-left:8px;">CURRENT</span>` : ''}
+        </div>
+        <div class="tariff-cost">€${t.monthlyCost.toFixed(0)}<span>/month avg</span></div>
+        <div class="tariff-saving" style="color:${saving > 0 ? 'var(--accent)' : saving < 0 ? 'var(--peak)' : 'var(--muted)'}">
+          ${isCurrent ? 'Your baseline' : saving > 0 ? `Save ~€${saving.toFixed(0)} over period` : `~€${Math.abs(saving).toFixed(0)} more expensive`}
+        </div>
+        <div class="tariff-rates">
+          <span class="tariff-rate-badge" style="color:var(--night)">Night €${t.night.toFixed(4)}</span>
+          <span class="tariff-rate-badge" style="color:var(--day)">Day €${t.day.toFixed(4)}</span>
+          ${t.peak ? `<span class="tariff-rate-badge" style="color:var(--peak)">Peak €${t.peak.toFixed(4)}</span>` : ''}
+          <span class="tariff-rate-badge">Standing €${t.standing.toFixed(4)}/d</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTrends(a) {
+  // Daily chart (last 60 days)
+  const recentDates = a.dates.slice(-60);
+  const recentVals = recentDates.map(d => a.byDate[d].toFixed(2));
+  const dateLabels = recentDates.map((d, i) => i % 10 === 0 ? fmtDate(d) : '');
+  destroyChart('daily');
+  charts['daily'] = new Chart(document.getElementById('chart-daily'), {
+    type: 'bar',
+    data: {
+      labels: recentDates.map(d => fmtDate(d)),
+      datasets: [{
+        data: recentVals,
+        backgroundColor: recentVals.map(v => +v > a.avgDaily * 1.5 ? 'rgba(244,63,94,0.7)' : 'rgba(0,212,170,0.4)'),
+        borderRadius: 3
+      }]
+    },
+    options: { ...chartDefaults, scales: { x: { ...chartDefaults.scales.x, ticks: { maxTicksLimit: 6, maxRotation: 30, color: '#6b8499', font: { size: 9 } } }, y: chartDefaults.scales.y } }
+  });
+
+  // Hourly avg
+  destroyChart('hourly');
+  charts['hourly'] = new Chart(document.getElementById('chart-hourly'), {
+    type: 'bar',
+    data: {
+      labels: Array.from({length:24}, (_,h) => h===0?'12am':h===12?'12pm':h<12?h+'am':(h-12)+'pm'),
+      datasets: [{
+        data: a.hourlyAvg.map(v => v.toFixed(3)),
+        backgroundColor: a.hourlyAvg.map((_, h) => {
+          if ([17,18].includes(h)) return 'rgba(244,63,94,0.7)';
+          if ([23,0,1,2,3,4,5,6,7].includes(h)) return 'rgba(167,139,250,0.6)';
+          return 'rgba(251,146,60,0.5)';
+        }),
+        borderRadius: 4
+      }]
+    },
+    options: { ...chartDefaults }
+  });
+
+  // DOW
+  destroyChart('dow');
+  charts['dow'] = new Chart(document.getElementById('chart-dow'), {
+    type: 'bar',
+    data: {
+      labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets: [{
+        data: a.dowAvg.map(v => v.toFixed(1)),
+        backgroundColor: 'rgba(79,195,247,0.5)',
+        borderRadius: 6
+      }]
+    },
+    options: { ...chartDefaults }
+  });
+
+  // Peak days
+  const sorted = Object.entries(a.byDate).sort((x,y) => y[1]-x[1]).slice(0,5);
+  document.getElementById('peak-days-list').innerHTML = sorted.map(([d,v],i) => `
+    <div class="shift-row">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="color:var(--muted);font-family:'DM Mono',monospace;font-size:12px">#${i+1}</span>
+        <span style="font-size:13px">${fmtDate(d)}</span>
+      </div>
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:${i===0?'var(--accent2)':'var(--text)'}">${v.toFixed(1)} kWh</div>
+    </div>
+  `).join('');
+}
+
+function renderAdvice(a) {
+  const advice = generateAdvice(a);
+  document.getElementById('advice-list').innerHTML = advice.map(item => `
+    <div class="card">
+      <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px">
+        <span style="font-size:24px">${item.icon}</span>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:3px">${item.title}</div>
+          <span class="rec-pill ${item.priority==='High'?'rec-high':item.priority==='Medium'?'rec-med':'rec-low'}">${item.priority} priority</span>
+          ${item.saving ? `<span class="rec-pill rec-low">~€${item.saving}/yr</span>` : ''}
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.7">${item.body}</div>
+    </div>
+  `).join('');
+}
+
+function generateInsights(a) {
+  const insights = [];
+  const nightPct = a.nightPct;
+  const months = Object.keys(a.byMonth).sort();
+  const firstMonthKwh = a.byMonth[months[0]];
+  const peakMonthKwh = Math.max(...Object.values(a.byMonth));
+  const seasonalMultiple = peakMonthKwh / firstMonthKwh;
+
+  insights.push({
+    icon: '🌙',
+    title: `${nightPct.toFixed(0)}% of usage is on night rate`,
+    body: `You're using <strong>${a.nightKwh.toFixed(0)} kWh</strong> overnight — saving approximately <strong>€${((a.nightKwh * (0.3091 - 0.1891)) * 1.09).toFixed(0)}</strong> vs if it were all billed at day rate. Your EV charging strategy is working well.`
+  });
+
+  insights.push({
+    icon: '📈',
+    title: `${seasonalMultiple.toFixed(1)}× seasonal increase`,
+    body: `Your peak month used <strong>${peakMonthKwh.toFixed(0)} kWh</strong> vs <strong>${firstMonthKwh.toFixed(0)} kWh</strong> in your first recorded month. Clear seasonal pattern driven by heating demand.`
+  });
+
+  if (a.peakKwh > 0) {
+    insights.push({
+      icon: '⚡',
+      title: `Peak rate exposure: ${a.peakPct.toFixed(1)}% of usage`,
+      body: `You're using <strong>${a.peakKwh.toFixed(0)} kWh</strong> during peak hours (5–7pm) costing <strong>€${(a.peakKwh*0.3354*1.09).toFixed(0)}</strong>. Shifting this to night rate would save ~€${(a.peakKwh/a.months*(0.3354-0.1891)*1.09).toFixed(0)}/month.`
+    });
+  }
+
+  insights.push({
+    icon: '🏠',
+    title: `Baseload ~${(a.baseload * 2).toFixed(2)} kW`,
+    body: `Your minimum overnight draw (always-on devices) is approximately <strong>${(a.baseload * 2).toFixed(2)} kW</strong>. This includes fridges, routers, standby devices. If higher than expected, something may be on unnecessarily.`
+  });
+
+  const bestTariff = a.tariffCosts[0];
+  if (!bestTariff.current) {
+    const saving = (a.tariffCosts.find(t => t.current)?.totalCost || a.totalCost) - bestTariff.totalCost;
+    insights.push({
+      icon: '💡',
+      title: `Better tariff available`,
+      body: `<strong>${bestTariff.name}</strong> (${bestTariff.plan}) would have saved approximately <strong>€${saving.toFixed(0)}</strong> over this period. Check the Tariffs tab for full comparison.`
+    });
+  }
+
+  return insights;
+}
+
+function generateAdvice(a) {
+  const advice = [];
+  const currentTariff = a.tariffCosts.find(t => t.current);
+  const bestTariff = a.tariffCosts[0];
+  const saving = !bestTariff.current ? (currentTariff?.totalCost || a.totalCost) - bestTariff.totalCost : 0;
+
+  if (!bestTariff.current) {
+    advice.push({
+      icon: '🔄', priority: 'High',
+      saving: (saving / a.months * 12).toFixed(0),
+      title: `Switch to ${bestTariff.name}`,
+      body: `Based on your actual usage data, switching to <strong>${bestTariff.name}</strong> (${bestTariff.plan}) would save you approximately <strong>€${saving.toFixed(0)}</strong> over the same period, or ~€${(saving/a.months*12).toFixed(0)} per year.<br><br>Your Yuno contract ends <strong>3 July 2026</strong>. Start comparing in May/June to be ready to switch penalty-free.`
+    });
+  }
+
+  if (a.peakKwh / a.total > 0.03) {
+    advice.push({
+      icon: '⏰', priority: 'High',
+      saving: (a.peakKwh/a.months*(0.3354-0.1891)*1.09*12).toFixed(0),
+      title: 'Avoid the 5–7pm peak window',
+      body: `You're using <strong>${(a.peakKwh/a.months).toFixed(0)} kWh/month</strong> during the peak rate window (5–7pm at €0.3354/kWh). Check what's running during this time — if your underfloor heating thermostat is programmed to boost at this time, moving the schedule earlier or later would save ~€${(a.peakKwh/a.months*(0.3354-0.1891)*1.09).toFixed(0)}/month.`
+    });
+  }
+
+  advice.push({
+    icon: '🚗', priority: 'Medium',
+    saving: null,
+    title: 'Track EV vs home costs separately',
+    body: `Use your Tesla and Skoda apps to log exact kWh added per charging session. Subtract this from your total monthly ESB usage to reveal your true home energy cost. This split will help you understand if your home heating or your cars are the bigger driver of high bills in winter.`
+  });
+
+  advice.push({
+    icon: '🌡️', priority: 'Medium',
+    saving: (a.avgDaily * 30 * 0.1 * 0.3091 * 1.09 * 12).toFixed(0),
+    title: 'Optimise underfloor heating schedule',
+    body: `Underfloor heating is most efficient when programmed to do its heavy lifting on the night rate (11pm–8am), using the thermal mass of the slab to store heat and then just maintaining temperature during the day. If your heating controller is running significant load during day/peak hours, shifting it could save 10–15% on your heating energy cost.`
+  });
+
+  advice.push({
+    icon: '📱', priority: 'Low',
+    saving: null,
+    title: 'Set up smart plugs on major appliances',
+    body: `For ~€20 each, a Shelly or TP-Link Tapo smart plug on your dishwasher, washing machine, and immersion heater will: (1) tell you exactly what each appliance costs, (2) let you schedule them for night rate automatically, and (3) alert you if anything is drawing power unexpectedly.`
+  });
+
+  advice.push({
+    icon: '🔌', priority: 'Low',
+    saving: (a.baseload * 2 * 0.1 * 8760 * 0.3091 * 1.09).toFixed(0),
+    title: 'Review always-on standby devices',
+    body: `Your baseload (minimum overnight draw) suggests always-on devices consuming ~${(a.baseload * 2).toFixed(2)} kW continuously. Each 10W device left on standby costs ~€3/month at day rate. TV consoles, older appliances, and network equipment on standby are common culprits worth switching off at the wall.`
+  });
+
+  advice.push({
+    icon: '☀️', priority: 'Low',
+    saving: null,
+    title: 'Consider solar microgeneration',
+    body: `With your high annual consumption (~${(a.total / a.months * 12).toFixed(0)} kWh/year), solar panels could significantly offset your bills. SEAI grants of up to €2,400 are available for residential solar in Ireland. With two EVs you could also benefit from vehicle-to-home (V2H) technology as it becomes available, using your car batteries as home storage.`
+  });
+
+  return advice;
+}
+
+// ============================================================
+// MAIN APP CONTROLLER
+// ============================================================
+let currentData = null;
+
+async function handleFile(file) {
+  if (!file || !file.name.endsWith('.csv')) {
+    showToast('Please select a CSV file');
+    return;
+  }
+  showToast('⚡ Parsing data...');
+  const text = await file.text();
+  const readings = parseCSV(text);
+  if (readings.length < 10) {
+    showToast('❌ Could not parse CSV — check format');
+    return;
+  }
+  await saveReadings(readings);
+  loadAndRender(readings);
+  showToast(`✓ Loaded ${readings.length.toLocaleString()} readings`);
+}
+
+function loadAndRender(readings) {
+  currentData = analyse(readings);
+  document.getElementById('upload-screen').style.display = 'none';
+  document.getElementById('main-pages').style.display = 'block';
+  document.getElementById('header').style.display = 'block';
+  renderOverview(currentData);
+  // Render other pages lazily when tab selected
+}
+
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// Tab navigation
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const page = tab.dataset.page;
+    document.getElementById('page-' + page).classList.add('active');
+    if (!currentData) return;
+    if (page === 'nightrate') renderNightRate(currentData);
+    else if (page === 'tariffs') renderTariffs(currentData);
+    else if (page === 'trends') renderTrends(currentData);
+    else if (page === 'advice') renderAdvice(currentData);
+  });
+});
+
+// File inputs
+['file-input', 'file-input-header'].forEach(id => {
+  document.getElementById(id).addEventListener('change', e => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+    e.target.value = '';
+  });
+});
+
+// Init
+openDB().then(async () => {
+  const stored = await loadReadings();
+  if (stored.length > 0) {
+    document.getElementById('load-history-btn').style.display = 'block';
+    document.getElementById('load-history-btn').addEventListener('click', () => {
+      loadAndRender(stored);
+    });
+  }
+});
+</script>
+</body>
+</html>
